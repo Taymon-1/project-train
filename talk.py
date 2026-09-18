@@ -31,13 +31,20 @@ session_lock = threading.Lock()
 HELP_TEXT = ("Say stop any time and I'll stop walking. "
              "Admin: !memory, !self, !diary, !tidy, !search TEXT, "
              "!read URL, !profile NAME, !tp REGION, !where, !look, !time, "
-             "!setprofile TEXT, !addpick NAME | DESCRIPTION, !delpick NAME, !help. "
+             "!setprofile TEXT, !addprofile TEXT, !addpick NAME | DESCRIPTION, !delpick NAME, !help. "
              "Or ask me to write something and then say 'put that in your profile' "
              "or 'put that in your picks'.")
 
 # Taymon saying these after she has composed something.
 PROFILE_PHRASE = re.compile(
-    r"\b(put|write|save|use) (that|this|it) (in|into|on|as) your (profile|about)\b", re.I)
+    r"\b(put|write|save|use|add|append|update|set|change|edit|copy|paste)\b"
+    r"[^.!?]{0,120}?\b(in|into|on|onto|to|as|with)?\s*(your|my|the)?\s*"
+    r"(profile|about box|about section|bio)\b", re.I)
+# Text handed over in the same message: "...profile: TEXT", "...to say TEXT",
+# or anything in quotes.
+PROFILE_INLINE = re.compile(
+    r"(?:profile|about|bio)\s*(?::|-|to say|saying|with|reading)\s*(.+)$", re.I | re.S)
+QUOTED = re.compile("[\"\u201c\u2018']([^\"\u201d\u2019']{12,})[\"\u201d\u2019']")
 PICK_PHRASE = re.compile(
     r"\b(put|add|save|make) (that|this|it|this (?:spot|place)) (in|into|to|as) "
     r"(?:your |a |one of your )?picks?\b", re.I)
@@ -227,11 +234,20 @@ def handle_command(speaker, message, is_owner=False):
         return sight.glance()
 
     # ---- her profile: About box and Picks only ----
-    if command.startswith("!setprofile"):
+    # !setprofile / !writeprofile TEXT  replaces the About box.
+    # !addprofile TEXT                  adds TEXT below what is there.
+    for word in ("!setprofile", "!writeprofile", "!profiletext"):
+        if command.startswith(word):
+            text = message.strip()[len(word):].strip()
+            if not text:
+                return f"Give me the text: {word} I build things with my brother."
+            return bio.write_about(text)[1]
+
+    if command.startswith("!addprofile"):
         text = message.strip()[11:].strip()
         if not text:
-            return "Give me the text: !setprofile I build things with my brother."
-        return bio.write_about(text)[1]
+            return "Give me the text to add: !addprofile Read about me at ..."
+        return bio.append_about(text)[1]
 
     if command.startswith("!addpick"):
         rest = message.strip()[8:].strip()
@@ -244,10 +260,21 @@ def handle_command(speaker, message, is_owner=False):
         return bio.delete_pick(message.strip()[8:].strip())[1]
 
     if PROFILE_PHRASE.search(message):
-        said = last_thing_she_said()
-        if not said:
-            return "I haven't written anything yet - tell me what to say first."
-        return bio.write_about(said)[1]
+        # Text in this message wins; otherwise the last thing she said.
+        inline = PROFILE_INLINE.search(message)
+        quoted = QUOTED.search(message)
+        if inline and len(inline.group(1).strip()) > 8:
+            text = inline.group(1).strip()
+        elif quoted:
+            text = quoted.group(1).strip()
+        else:
+            text = last_thing_she_said()
+        if not text:
+            return ("Tell me the words first, or paste them like this: "
+                    "!addprofile Read about me at projecttrain.org")
+        adding = re.search(r"\b(add|append|below|underneath|as well|also)\b",
+                           message, re.I) is not None
+        return (bio.append_about(text) if adding else bio.write_about(text))[1]
 
     if PICK_PHRASE.search(message):
         said = last_thing_she_said()
@@ -293,6 +320,13 @@ def handle_command(speaker, message, is_owner=False):
         if travel.go_to(where):
             return "Made it."
         return "That teleport didn't take - the console has the reason."
+
+    if command.startswith("!"):
+        # A command she does not have. Never let Aion answer this - it
+        # would cheerfully claim to have done it.
+        print(f"  (unknown command: {message.strip()[:40]})")
+        return ("I don't have a command called "
+                f"{message.strip().split()[0]}. Type !help for the list.")
 
     return None
 
