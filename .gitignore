@@ -1,0 +1,38 @@
+# ---- SECRETS ----
+# The real settings file holds API keys, passwords and avatar keys.
+# config.example.py is the shareable copy with placeholders.
+config.py
+keys.py
+*.env
+.env*
+*token*
+*secret*
+
+# ---- HER MEMORY - PRIVATE, NEVER PUBLISHED ----
+memory/
+*.diary*
+*diary*.json
+train_self*.json
+greeted.json
+
+# ---- ANYTHING THAT COULD CARRY ADDRESSES OR KEYS ----
+*.log
+*.pem
+*.pfx
+*.p12
+*.cer
+*.key
+
+# ---- PYTHON JUNK ----
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ---- EDITOR AND OS JUNK ----
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.tmp
