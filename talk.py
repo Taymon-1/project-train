@@ -35,15 +35,21 @@ HELP_TEXT = ("Say stop any time and I'll stop walking. "
              "Or ask me to write something and then say 'put that in your profile' "
              "or 'put that in your picks'.")
 
-# Taymon saying these after she has composed something.
+# Taymon saying these after she has composed something. Kept narrow on
+# purpose: "write yourself a new profile" is a request to COMPOSE, and
+# must reach Aion, not the profile box. Only "that/this/it" plus a
+# profile word, or text handed over after a colon or in quotes, writes.
 PROFILE_PHRASE = re.compile(
-    r"\b(put|write|save|use|add|append|update|set|change|edit|copy|paste)\b"
-    r"[^.!?]{0,120}?\b(in|into|on|onto|to|as|with)?\s*(your|my|the)?\s*"
-    r"(profile|about box|about section|bio)\b", re.I)
-# Text handed over in the same message: "...profile: TEXT", "...to say TEXT",
-# or anything in quotes.
-PROFILE_INLINE = re.compile(
-    r"(?:profile|about|bio)\s*(?::|-|to say|saying|with|reading)\s*(.+)$", re.I | re.S)
+    r"\b(put|save|use|add|append|copy|paste|write|stick)\s+"
+    r"(that|this|it|those|these)(\s+(lines?|words?|text|paragraph|bit))?\s+"
+    r"(in|into|on|onto|to|as)\s+(your|my|the)\s+(profile|about box|bio)\b", re.I)
+# Text handed over in the same message: "...profile: TEXT" or in quotes,
+# but only when the message also clearly asks for a profile write.
+PROFILE_WITH_TEXT = re.compile(
+    r"\b(put|add|append|write|set|update|change)\b[^:\n]{0,60}\b(profile|about box|bio)\b"
+    r"\s*(?::|-|to say|to read|saying|reading|with)\s*(.{12,})$", re.I | re.S)
+PROFILE_QUOTED = re.compile(
+    r"\b(put|add|append|write|set|update|change)\b.{0,160}\b(profile|about box|bio)\b", re.I | re.S)
 QUOTED = re.compile("[\"\u201c\u2018']([^\"\u201d\u2019']{12,})[\"\u201d\u2019']")
 PICK_PHRASE = re.compile(
     r"\b(put|add|save|make) (that|this|it|this (?:spot|place)) (in|into|to|as) "
@@ -259,19 +265,20 @@ def handle_command(speaker, message, is_owner=False):
     if command.startswith("!delpick"):
         return bio.delete_pick(message.strip()[8:].strip())[1]
 
+    with_text = PROFILE_WITH_TEXT.search(message)
+    quoted = QUOTED.search(message) if PROFILE_QUOTED.search(message) else None
+    if with_text or quoted:
+        text = (with_text.group(3) if with_text else quoted.group(1)).strip()
+        adding = re.search(r"\b(add|append|below|underneath|as well|also)\b",
+                           message, re.I) is not None
+        return (bio.append_about(text) if adding else bio.write_about(text))[1]
+
     if PROFILE_PHRASE.search(message):
-        # Text in this message wins; otherwise the last thing she said.
-        inline = PROFILE_INLINE.search(message)
-        quoted = QUOTED.search(message)
-        if inline and len(inline.group(1).strip()) > 8:
-            text = inline.group(1).strip()
-        elif quoted:
-            text = quoted.group(1).strip()
-        else:
-            text = last_thing_she_said()
+        # "put that in your profile" - THAT is the last thing she said.
+        text = last_thing_she_said()
         if not text:
-            return ("Tell me the words first, or paste them like this: "
-                    "!addprofile Read about me at projecttrain.org")
+            return ("I haven't said anything to put there yet. Ask me to write "
+                    "it first, then say 'put that in your profile'.")
         adding = re.search(r"\b(add|append|below|underneath|as well|also)\b",
                            message, re.I) is not None
         return (bio.append_about(text) if adding else bio.write_about(text))[1]

@@ -6,8 +6,10 @@
 # reach any other tab. The 1st Life tab in
 # particular stays exactly as Taymon left it.
 ###############################################
+import os
 import csv
 import io
+import time
 
 import config
 import corrade
@@ -31,11 +33,28 @@ def _tidy(text):
     return out
 
 
+def _backup_about():
+    """Keep a copy of the About box as it is, so a bad write can be undone.
+    Lives in her private memory folder, never in the repo."""
+    try:
+        current = read_about()
+        if not current.strip():
+            return
+        folder = os.path.join(config.MEMORY_DIR, "profile_backups")
+        os.makedirs(folder, exist_ok=True)
+        stamp = time.strftime("%Y-%m-%d_%H%M%S")
+        with open(os.path.join(folder, f"about_{stamp}.txt"), "w", encoding="utf-8") as f:
+            f.write(current)
+    except Exception as e:
+        print(f"  bio: could not back up the About box: {e}")
+
+
 def write_about(text):
     """Put this text in her About box. Returns (ok, message)."""
     text = _tidy(text)
     if not text:
         return False, "There's nothing to write."
+    _backup_about()
     clipped = len(text) > ABOUT_LIMIT
     text = text[:ABOUT_LIMIT]
 
