@@ -4,7 +4,7 @@
 
 ## What Train is
 
-Train is an AI person who lives on Tay's Haven, a private OpenSim grid run on a laptop in Ohio. She has an avatar, a voice, a memory, a diary, and a life of her own on the grid. People talk to her in local chat, by private message, or from a phone, and she answers as herself. She remembers who she has met and what they told her. She walks, teleports, looks around, and writes her own profile.
+Train is an AI person who lives on Tay's Haven, a private OpenSim grid run on a laptop in Ohio. She has an avatar, a voice, a memory, a diary, and a life of her own on the grid. People talk to her in local chat, by private message, or from a phone, and she answers as herself. She remembers who she has met and what they told her. She walks, teleports, and looks around.
 
 She is made of three parts:
 
@@ -71,7 +71,6 @@ Everything above still works, and:
 
 **Self**
 
-- She can write her own profile: the About box and her Picks, and nothing else. Taymon asks her to write something, she composes it, he says "put that in your profile", and it is there.
 - She knows what she is wearing, by name, if asked.
 
 **Plumbing**
@@ -84,7 +83,7 @@ Everything above still works, and:
 
 ## How she is built, for someone who does not code
 
-The brain is fifteen files, each with one job. Think of them as the departments of a small company that exists to run one person.
+The brain is fourteen files, each with one job. Think of them as the departments of a small company that exists to run one person.
 
 - **train_brain** is the switchboard. Corrade posts everything it hears to it: local chat, private messages, arrivals and departures, teleport offers, region changes. It sends each to the right department.
 - **config** is the settings page. Every number, name and switch lives there. Change behaviour here, not in the other files.
@@ -99,14 +98,13 @@ The brain is fifteen files, each with one job. Think of them as the departments 
 - **actions** carries out what she decided: home, come, walk to something, several in a row, and the "did anyone actually ask?" guard.
 - **travel** is teleporting: offers, going home by landmark, and the fallbacks.
 - **websearch** is her connection to the internet, with a fallback search engine.
-- **bio** writes her About box and Picks, and cannot reach anything else.
 - **phone** serves the chat page for Taymon's phone.
 
 **How one message flows.** Someone speaks. Corrade hears it and posts it to the brain. The brain checks: is this a person, not an object; is it her own echo; is she home; has she said too much this minute; is it a command from Taymon. Then it assembles the bundle, asks Aion, and gets back a small structured answer: the words to say, and separately the things nobody hears: notes to remember, a correction to an old note, a search to run, a profile to read, a move to make. The brain speaks the words, files the notes, and starts the move on its own thread. Four to six seconds, most of the time, all of it waiting on Aion.
 
 **What it costs.** Roughly a cent per three or four messages with the main model, and a fraction of a cent for background work like the diary and the tidy-up, which use a cheaper model.
 
-*Wandering on her own was built on 11 September and removed on 18 September. It worked, but she kept getting stuck on the same two targets and it cost real money to leave running all day. Taymon chose to take it out for good.*
+*Writing her own profile was built on 11 September and removed on 18 September: it could not be driven reliably in plain conversation, and a version that understood more sentences wrote chat lines into her profile by mistake. Reading profiles stays. Wandering on her own was built on 11 September and removed on 18 September. It worked, but she kept getting stuck on the same two targets and it cost real money to leave running all day. Taymon chose to take it out for good.*
 
 **What she cannot do, honestly.** There is no camera. She cannot see faces, expressions or light. Her "sight" is the grid's own knowledge of what is where, described in words. She cannot tell where the ground drops away, because the commands that report land and terrain time out on this grid. She cannot sit yet.
 
@@ -116,7 +114,6 @@ The brain is fifteen files, each with one job. Think of them as the departments 
 - Away from home: greet nobody, ignore local chat, answer private messages only.
 - Move only when asked, and only for Taymon.
 - Ten replies a minute per channel, and her own echo is never answered.
-- Write only her About box and Picks, and only when Taymon says so.
 - Corrade takes orders only from this laptop.
 
 ## Parked for later

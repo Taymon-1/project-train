@@ -21,7 +21,6 @@ import actions
 import travel
 import websearch
 import sight
-import bio
 
 conversation = []          # short-term chat buffer
 session_lines = []         # transcript waiting for the diary
@@ -30,30 +29,8 @@ session_lock = threading.Lock()
 
 HELP_TEXT = ("Say stop any time and I'll stop walking. "
              "Admin: !memory, !self, !diary, !tidy, !search TEXT, "
-             "!read URL, !profile NAME, !tp REGION, !where, !look, !time, "
-             "!setprofile TEXT, !addprofile TEXT, !addpick NAME | DESCRIPTION, !delpick NAME, !help. "
-             "Or ask me to write something and then say 'put that in your profile' "
-             "or 'put that in your picks'.")
-
-# Taymon saying these after she has composed something. Kept narrow on
-# purpose: "write yourself a new profile" is a request to COMPOSE, and
-# must reach Aion, not the profile box. Only "that/this/it" plus a
-# profile word, or text handed over after a colon or in quotes, writes.
-PROFILE_PHRASE = re.compile(
-    r"\b(put|save|use|add|append|copy|paste|write|stick)\s+"
-    r"(that|this|it|those|these)(\s+(lines?|words?|text|paragraph|bit))?\s+"
-    r"(in|into|on|onto|to|as)\s+(your|my|the)\s+(profile|about box|bio)\b", re.I)
-# Text handed over in the same message: "...profile: TEXT" or in quotes,
-# but only when the message also clearly asks for a profile write.
-PROFILE_WITH_TEXT = re.compile(
-    r"\b(put|add|append|write|set|update|change)\b[^:\n]{0,60}\b(profile|about box|bio)\b"
-    r"\s*(?::|-|to say|to read|saying|reading|with)\s*(.{12,})$", re.I | re.S)
-PROFILE_QUOTED = re.compile(
-    r"\b(put|add|append|write|set|update|change)\b.{0,160}\b(profile|about box|bio)\b", re.I | re.S)
-QUOTED = re.compile("[\"\u201c\u2018']([^\"\u201d\u2019']{12,})[\"\u201d\u2019']")
-PICK_PHRASE = re.compile(
-    r"\b(put|add|save|make) (that|this|it|this (?:spot|place)) (in|into|to|as) "
-    r"(?:your |a |one of your )?picks?\b", re.I)
+             "!read URL, !profile NAME, !tp REGION, !where, !look, !time, !help. "
+             "Everything else, just ask me normally.")
 
 URL_PATTERN = re.compile(r'(https?://[^\s<>"\']+|www\.[^\s<>"\']+)', re.I)
 
@@ -238,55 +215,6 @@ def handle_command(speaker, message, is_owner=False):
 
     if command == "!look":
         return sight.glance()
-
-    # ---- her profile: About box and Picks only ----
-    # !setprofile / !writeprofile TEXT  replaces the About box.
-    # !addprofile TEXT                  adds TEXT below what is there.
-    for word in ("!setprofile", "!writeprofile", "!profiletext"):
-        if command.startswith(word):
-            text = message.strip()[len(word):].strip()
-            if not text:
-                return f"Give me the text: {word} I build things with my brother."
-            return bio.write_about(text)[1]
-
-    if command.startswith("!addprofile"):
-        text = message.strip()[11:].strip()
-        if not text:
-            return "Give me the text to add: !addprofile Read about me at ..."
-        return bio.append_about(text)[1]
-
-    if command.startswith("!addpick"):
-        rest = message.strip()[8:].strip()
-        name, _, description = rest.partition("|")
-        if not name.strip():
-            return "Give it a name: !addpick The couch | Where I hang out."
-        return bio.add_pick(name.strip(), description.strip())[1]
-
-    if command.startswith("!delpick"):
-        return bio.delete_pick(message.strip()[8:].strip())[1]
-
-    with_text = PROFILE_WITH_TEXT.search(message)
-    quoted = QUOTED.search(message) if PROFILE_QUOTED.search(message) else None
-    if with_text or quoted:
-        text = (with_text.group(3) if with_text else quoted.group(1)).strip()
-        adding = re.search(r"\b(add|append|below|underneath|as well|also)\b",
-                           message, re.I) is not None
-        return (bio.append_about(text) if adding else bio.write_about(text))[1]
-
-    if PROFILE_PHRASE.search(message):
-        # "put that in your profile" - THAT is the last thing she said.
-        text = last_thing_she_said()
-        if not text:
-            return ("I haven't said anything to put there yet. Ask me to write "
-                    "it first, then say 'put that in your profile'.")
-        adding = re.search(r"\b(add|append|below|underneath|as well|also)\b",
-                           message, re.I) is not None
-        return (bio.append_about(text) if adding else bio.write_about(text))[1]
-
-    if PICK_PHRASE.search(message):
-        said = last_thing_she_said()
-        place = corrade.where_am_i() or "Here"
-        return bio.add_pick(place, said or "")[1]
 
     if command == "!tidy":
         threading.Thread(target=memory.force_consolidate,

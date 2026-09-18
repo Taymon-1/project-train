@@ -1,6 +1,6 @@
 # Project Train
 
-Train is an AI-powered avatar who lives in an [OpenSimulator](http://opensimulator.org/) virtual world. She talks to people in local chat, by private message, or from a phone; she remembers who she has met and what they told her; she keeps a diary; she looks around, walks to things, teleports, and writes her own profile.
+Train is an AI-powered avatar who lives in an [OpenSimulator](http://opensimulator.org/) virtual world. She talks to people in local chat, by private message, or from a phone; she remembers who she has met and what they told her; she keeps a diary; she looks around, walks to things, and teleports.
 
 This is a learning project built by one person, one file at a time, with help from AI assistants along the way. It is shared as-is, in the hope that it is useful or interesting to someone building their own.
 
@@ -33,9 +33,11 @@ The story of the build, with the wins and the dead ends, is on the blog: **https
 
 Her diary and memory files are private and are not included. They live in a `memory/` folder that git ignores, along with `config.py`, which holds keys and passwords. Her personality file, `persona.py`, is included so the structure of her prompt can be seen.
 
-## About the wander feature
+## Two features that were tried and removed
 
-For a week she could wander around the region on her own when nobody was talking to her, choosing where to go and why. It worked. The developer decided to shelve it in favor of future plans, and it was removed intentionally rather than left switched off. The rest of her movement, coming when called and walking to things she is asked to, is unchanged.
+**Wandering.** For a week she could wander around the region on her own when nobody was talking to her, choosing where to go and why. It worked. The developer decided to shelve it in favor of future plans, and it was removed intentionally rather than left switched off. The rest of her movement, coming when called and walking to things she is asked to, is unchanged.
+
+**Writing her own profile.** She could read and write her in-world About box. Reading stays. Writing was removed because it could not be driven reliably in plain conversation: the trigger was either too narrow to understand a natural request or too wide and wrote chat lines into the box by mistake. Rather than promise a feature that only works with exact commands, it was taken out. Corrade can do it; the piece that is missing is a trustworthy way for her to decide when.
 
 ## License
 
