@@ -83,6 +83,77 @@ def trim_narration(text):
     return kept
 
 
+# ---- TYPOS ----
+# A real person's fingers slip now and then. One small slip, sometimes,
+# in an ordinary lowercase word - never in a name, a place, a web
+# address, a number, or a very short word.
+import random
+
+_NEARBY = {
+    "q": "wa", "w": "qes", "e": "wrd", "r": "etf", "t": "ryg", "y": "tuh",
+    "u": "yij", "i": "uok", "o": "ipl", "p": "ol",
+    "a": "qsz", "s": "adwx", "d": "sfec", "f": "dgrv", "g": "fhtb",
+    "h": "gjyn", "j": "hkum", "k": "jlio", "l": "kop",
+    "z": "xas", "x": "zcsd", "c": "xvdf", "v": "cbfg", "b": "vngh",
+    "n": "bmhj", "m": "njk",
+}
+_WORD = re.compile(r"[A-Za-z']+")
+
+
+def _typo_safe(word, text, start):
+    """Is this a word a slip could plausibly land in?"""
+    if len(word) < 4 or not word.isalpha() or not word.islower():
+        return False                      # short, odd, or Capitalised
+    # Part of a web address or a dotted thing? Look around it.
+    before = text[max(0, start - 1):start]
+    after = text[start + len(word):start + len(word) + 1]
+    if before in (".", "/", "@", ":") or after in (".", "/", "@"):
+        # a dot right after is fine at the end of a sentence
+        if not (after == "." and (start + len(word) + 1 >= len(text)
+                                  or text[start + len(word) + 1] in " \n")):
+            return False
+    return True
+
+
+def slip(text):
+    """Return the text with one human typo in it, or unchanged."""
+    if not getattr(config, "TYPOS_ENABLED", False) or not text:
+        return text
+    if random.random() >= getattr(config, "TYPO_CHANCE", 0.0):
+        return text
+    if "://" in text or "www." in text:
+        return text                       # a link is in here; leave it all
+    if len(text) < 15:
+        return text
+
+    spots = [(m.start(), m.group()) for m in _WORD.finditer(text)
+             if _typo_safe(m.group(), text, m.start())]
+    if not spots:
+        return text
+    start, word = random.choice(spots)
+
+    kind = random.choice(("double", "swap", "miss", "nearby"))
+    i = random.randrange(1, len(word) - 1)          # never first or last letter
+    if kind == "double":
+        new = word[:i] + word[i] + word[i:]
+    elif kind == "swap":
+        if word[i] == word[i + 1]:
+            return text
+        new = word[:i] + word[i + 1] + word[i] + word[i + 2:]
+    elif kind == "miss":
+        new = word[:i] + word[i + 1:]
+    else:
+        near = _NEARBY.get(word[i], "")
+        if not near:
+            return text
+        new = word[:i] + random.choice(near) + word[i + 1:]
+
+    if new == word:
+        return text
+    print(f"  (typo: {word} -> {new})")
+    return text[:start] + new + text[start + len(word):]
+
+
 def ask(model, messages, max_tokens, label="", _retry=True):
     """Send a request. Returns (text, finish_reason). text is None on failure.
 
@@ -249,13 +320,13 @@ def parse_turn(raw):
             facts = facts[:room]
             self_facts = self_facts[:max(0, room - len(facts))]
 
-            return reply, facts, self_facts, corrections
+            return slip(reply), facts, self_facts, corrections
 
     # Broken or truncated - rescue the spoken line, drop the rest
     salvaged = trim_narration(salvage_reply(raw))
     if salvaged:
         print("  (answer was malformed - kept the reply, discarded notes)")
         print(f"  RAW ANSWER: {str(raw)[:800]}")
-        return salvaged, [], [], []
+        return slip(salvaged), [], [], []
 
     return None, [], [], []
