@@ -4,7 +4,7 @@
 
 ## What Train is
 
-Train is an AI person who lives on Tay's Haven, a private OpenSim grid run on a laptop in Ohio. She has an avatar, a voice, a memory, a diary, and a life of her own on the grid. People talk to her in local chat, by private message, or from a phone, and she answers as herself. She remembers who she has met and what they told her. She walks, teleports, and looks around.
+Train is an AI person who lives on Tay's Haven, a private OpenSim grid run on a laptop in Ohio. She has an avatar, a voice, a memory, a diary, and a life of her own on the grid. People talk to her in local chat or by private message, and she answers as herself. She remembers who she has met and what they told her. She walks, teleports, and looks around.
 
 She is made of three parts:
 
@@ -75,7 +75,7 @@ Everything above still works, and:
 
 **Plumbing**
 
-- Corrade only accepts commands from this laptop. The phone page is still reachable from the home network, as intended.
+- Corrade only accepts commands from this laptop, and the brain only listens to this laptop too.
 - Corrade now logs her in through the grid's public front door, the same way a viewer does. That was the fix for the slow trips home: the grid compares the address she logged in from with the address she comes home from, and they now match.
 - Chat is answered on its own thread, so a slow Aion can never make Corrade give up on her.
 - Her standing pose keeps trying until Corrade is ready.
@@ -83,7 +83,7 @@ Everything above still works, and:
 
 ## How she is built, for someone who does not code
 
-The brain is fourteen files, each with one job. Think of them as the departments of a small company that exists to run one person.
+The brain is thirteen working files, each with one job. Think of them as the departments of a small company that exists to run one person.
 
 - **train_brain** is the switchboard. Corrade posts everything it hears to it: local chat, private messages, arrivals and departures, teleport offers, region changes. It sends each to the right department.
 - **config** is the settings page. Every number, name and switch lives there. Change behaviour here, not in the other files.
@@ -98,7 +98,6 @@ The brain is fourteen files, each with one job. Think of them as the departments
 - **actions** carries out what she decided: home, come, walk to something, several in a row, and the "did anyone actually ask?" guard.
 - **travel** is teleporting: offers, going home by landmark, and the fallbacks.
 - **websearch** is her connection to the internet, with a fallback search engine.
-- **phone** serves the chat page for Taymon's phone.
 
 **How one message flows.** Someone speaks. Corrade hears it and posts it to the brain. The brain checks: is this a person, not an object; is it her own echo; is she home; has she said too much this minute; is it a command from Taymon. Then it assembles the bundle, asks Aion, and gets back a small structured answer: the words to say, and separately the things nobody hears: notes to remember, a correction to an old note, a search to run, a profile to read, a move to make. The brain speaks the words, files the notes, and starts the move on its own thread. Four to six seconds, most of the time, all of it waiting on Aion.
 

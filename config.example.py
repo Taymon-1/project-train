@@ -33,11 +33,11 @@ MAX_REPLY_TOKENS = 2000    # room for the reply AND its memory notes.
 MAX_DIARY_TOKENS = 2500    # the cheap model thinks silently first and
 MAX_TIDY_TOKENS = 6000     # that counts; at 500/2000 entries were lost
 
-# ---- PHONE CHAT ----
-LISTEN_HOST = "0.0.0.0"    # 0.0.0.0 = reachable from your home network
+# ---- WHERE CORRADE REPORTS TO ----
+# The brain's own little web server. Corrade posts everything she
+# hears here. Only this laptop needs to reach it.
+LISTEN_HOST = "127.0.0.1"  # this laptop only
 LISTEN_PORT = 5000
-PHONE_PASSWORD = "choose-a-password"
-PHONE_USER = OWNER_NAME    # whose memory file the phone chat writes to
 
 # ---- HER BODY ----
 STAND_ANIM = "stand2"      # her resting pose

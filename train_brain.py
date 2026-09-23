@@ -11,7 +11,6 @@
 #   travel.py       teleporting
 #   actions.py      carrying out her decisions
 #   talk.py         conversation, greetings, diary
-#   phone.py        the phone chat page
 #
 # This file just joins them together.
 ###############################################
@@ -33,7 +32,6 @@ import vision
 import travel
 import actions
 import talk
-import phone
 import sight
 
 app = Flask(__name__)
@@ -133,7 +131,7 @@ def handle_chat():
     # Answer on a thread of her own, so Corrade gets its acknowledgement
     # at once however long Aion takes.
     def worker():
-        reply = talk.respond_to(name, message, from_phone=False,
+        reply = talk.respond_to(name, message,
                                 speaker_name=name, channel="local",
                                 speaker_uuid=speaker_uuid)
         if reply:
@@ -177,7 +175,7 @@ def handle_im():
     print(f"\n>> {name} (IM): {message}")
 
     def worker():
-        reply = talk.respond_to(name, message, from_phone=False,
+        reply = talk.respond_to(name, message,
                                 speaker_name=name, channel="im",
                                 speaker_uuid=sender_uuid)
         if reply:
@@ -315,8 +313,6 @@ def subscribe_all():
 # ---- STARTUP ----
 
 if __name__ == '__main__':
-    phone.register(app, talk.respond_to)
-
     print("=" * 50)
     print("  TRAIN'S BRAIN - Tay's Haven AI Bot")
     print("=" * 50)
@@ -346,8 +342,6 @@ if __name__ == '__main__':
     print(f"Self notes: {len(me.get('core', []))} core, "
           f"{len(me.get('archive', []))} archived")
     print(f"Diary entries: {len(me.get('diary', []))}")
-
-    phone.banner()
 
     corrade.assume_home()
     threading.Timer(3.0, subscribe_all).start()

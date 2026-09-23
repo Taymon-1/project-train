@@ -52,8 +52,6 @@ CHANNEL_NOTES = {
            "the sender can see it, and they may not even be in the same "
            "region as you - so do not talk as though they are standing "
            "in front of you unless you know they are."),
-    "phone": ("Taymon is messaging you from his phone, away from the grid. "
-              "Between the two of you only."),
 }
 
 # What she might put in the "profile" field instead of a name.
@@ -317,17 +315,15 @@ def _second_pass(messages, reply, prompt_template, results, speaker, label):
     return new_reply, facts, self_facts, corrections, ai.extract_json(raw) or {}
 
 
-def respond_to(speaker, message, from_phone=False, speaker_name=None,
+def respond_to(speaker, message, speaker_name=None,
                channel=None, speaker_uuid=None):
     """
-    The one path the grid, IM and the phone all go through.
+    The one path local chat and IMs both go through.
     Returns what she says, or None when she has nothing to say.
     """
     global last_message_time
 
-    # The phone is Taymon's alone; everyone else is judged by their key.
-    if from_phone:
-        speaker_uuid = config.OWNER_UUID
+    # Everyone is judged by their key.
     is_owner = corrade.is_owner(speaker_uuid)
 
     canned = handle_command(speaker, message, is_owner)
@@ -335,7 +331,7 @@ def respond_to(speaker, message, from_phone=False, speaker_name=None,
         return canned or None
 
     if not channel:
-        channel = "phone" if from_phone else "local"
+        channel = "local"
 
     started = time.time()
     stage = {"begin": started}        # where the seconds go, for the console
@@ -364,13 +360,13 @@ def respond_to(speaker, message, from_phone=False, speaker_name=None,
                 messages.append(block)
 
         # A look around, when asked about it or when she just landed.
-        seen = None if from_phone else sight.for_message(message)
+        seen = sight.for_message(message)
         if seen:
             messages.append({"role": "system",
                              "content": SIGHT_HEADER + "\n\n" + seen})
 
         # Someone she has no notes on - glance at their profile first.
-        if not (record.get("core") or record.get("archive")) and not from_phone:
+        if not (record.get("core") or record.get("archive")):
             profile = corrade.get_profile(speaker_name or speaker,
                                           uuid=speaker_uuid)
             if profile:
@@ -381,9 +377,7 @@ def respond_to(speaker, message, from_phone=False, speaker_name=None,
                                               system_text, history))
         messages.extend(history)
 
-        if channel == "phone":
-            prefix = f"{shown} messages you from his phone"
-        elif channel == "im":
+        if channel == "im":
             prefix = f"{shown} sends you an instant message"
         else:
             prefix = f"{shown} says in local chat"
@@ -493,7 +487,7 @@ def respond_to(speaker, message, from_phone=False, speaker_name=None,
             del conversation[:-config.MAX_HISTORY]
 
         with session_lock:
-            tag = {"phone": " (phone)", "im": " (IM)"}.get(channel, "")
+            tag = {"im": " (IM)"}.get(channel, "")
             session_lines.append(f"{speaker}{tag}: {message}")
             if holding_line and holding_line != reply:
                 session_lines.append(f"Train: {holding_line}")

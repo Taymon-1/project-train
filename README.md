@@ -1,6 +1,6 @@
 # Project Train
 
-Train is an AI-powered avatar who lives in an [OpenSimulator](http://opensimulator.org/) virtual world. She talks to people in local chat, by private message, or from a phone; she remembers who she has met and what they told her; she keeps a diary; she looks around, walks to things, and teleports.
+Train is an AI-powered avatar who lives in an [OpenSimulator](http://opensimulator.org/) virtual world. She talks to people in local chat or by private message; she remembers who she has met and what they told her; she keeps a diary; she looks around, walks to things, and teleports.
 
 This is a learning project built by one person, one file at a time, with help from AI assistants along the way. It is shared as-is, in the hope that it is useful or interesting to someone building their own.
 
@@ -16,7 +16,7 @@ The story of the build, with the wins and the dead ends, is on the blog: **https
 
 ## Running it
 
-1. Install Python 3.12 or newer, then `pip install flask requests openai sentence-transformers ddgs qrcode`.
+1. Install Python 3.12 or newer, then `pip install flask requests openai sentence-transformers ddgs`.
 2. Install and configure [Corrade](https://grimore.org/secondlife/scripted_agents/corrade) with a group that has the `talk`, `grooming`, `notifications`, `movement`, `interact` and `inventory` permissions, and its HTTP server listening on this machine.
 3. Copy `config.example.py` to `config.py` and fill in your own names, keys and passwords. `config.py` is ignored by git and is never published.
 4. Run `start_brain.bat` (or `python train_brain.py`).
