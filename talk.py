@@ -133,6 +133,56 @@ def _channel_block(channel):
     return {"role": "system", "content": note} if note else None
 
 
+# ---- WHAT SHE JUST LOOKED UP ----
+# Her short-term chat memory holds only what was said, not what she
+# found - so when someone followed up on something she had just
+# searched, she searched for it all over again. Now the last lookup
+# stays in front of her for a few messages, and asking for the very
+# same search or page again reuses what was already found.
+
+last_lookup = {}
+
+
+def _lookup_key(text):
+    return " ".join(str(text).lower().split()).strip(" .,;:!?\"'/")
+
+
+def _remember_lookup(kind, keys, label, results):
+    """kind: search / read / pasted. keys: the search words or links.
+    Kept whole for reuse, and as a short copy for her to carry."""
+    brief = results.split("\nFull text from the first result", 1)[0]
+    brief = brief[:config.LOOKUP_BRIEF_CHARS]
+    last_lookup.clear()
+    last_lookup.update({"kind": kind, "keys": {_lookup_key(k) for k in keys},
+                        "label": label, "full": results, "brief": brief,
+                        "at": time.time(), "left": config.LOOKUP_REMEMBER_MESSAGES})
+
+
+def _lookup_still_fresh():
+    return (last_lookup and last_lookup["left"] > 0 and
+            time.time() - last_lookup["at"] < config.LOOKUP_REMEMBER_MINUTES * 60)
+
+
+def _same_lookup(key):
+    """The stored results, if this search or link is the one just done."""
+    if _lookup_still_fresh() and _lookup_key(key) in last_lookup["keys"]:
+        return last_lookup["full"]
+    return None
+
+
+def _recent_lookup_block():
+    """What she found a moment ago, for this message. Counts down."""
+    if not _lookup_still_fresh():
+        return None
+    last_lookup["left"] -= 1
+    return {"role": "system", "content":
+            f"A moment ago you {last_lookup['label']}. This is what you found:\n\n"
+            f"{last_lookup['brief']}\n\n"
+            f"If whoever you are talking to is following up on it, answer from "
+            f"this - do not look up the same thing again. Only search if they "
+            f"ask about something it does not cover."}
+
+
 # ---- PASTED LINKS ----
 
 def find_urls(text):
@@ -161,6 +211,8 @@ def read_links(urls, name):
             blocks.append(f"Page at {url}: could not be opened or read.")
     if not blocks:
         return None
+    _remember_lookup("pasted", urls, f"read the page {name} pasted",
+                     "\n\n".join(blocks))
     header = persona.PASTED_PAGE_HEADER.format(name=name).strip()
     return header + "\n\n" + "\n\n".join(blocks)
 
@@ -375,6 +427,11 @@ def respond_to(speaker, message, speaker_name=None,
 
         messages.extend(memory.build_notebook(record, me, message,
                                               system_text, history))
+        recent = _recent_lookup_block()
+        if recent:
+            messages.append(recent)
+            print(f"  (carrying what she looked up a moment ago - "
+                  f"{last_lookup['left']} more message(s) after this)")
         messages.extend(history)
 
         if channel == "im":
@@ -443,17 +500,31 @@ def respond_to(speaker, message, speaker_name=None,
                 started = time.time()
 
             if query:
-                results = websearch.look_up(query)
+                results = _same_lookup(query)
+                if results:
+                    print("  SEARCH: same as a moment ago - reusing what she found")
+                else:
+                    results = websearch.look_up(query)
+                    if results:
+                        _remember_lookup("search", [query], f'looked up "{query}"',
+                                         results)
                 template = persona.SEARCH_RESULTS_PROMPT
                 label = "(search)"
                 note = f"(looked up: {query})"
                 if not results:
                     results = "The search came back empty - nothing was found."
             elif link:
-                print(f"  READING: {link}")
-                page = websearch.read_page(link, limit=config.URL_CHARS)
-                results = (f"Page at {link}:\n{page}" if page
-                           else f"The page at {link} could not be read.")
+                results = _same_lookup(link)
+                if results:
+                    print("  READING: same page as a moment ago - reusing what she read")
+                else:
+                    print(f"  READING: {link}")
+                    page = websearch.read_page(link, limit=config.URL_CHARS)
+                    results = (f"Page at {link}:\n{page}" if page
+                               else f"The page at {link} could not be read.")
+                    if page:
+                        _remember_lookup("read", [link], f"read the page at {link}",
+                                         results)
                 template = persona.PAGE_PROMPT
                 label = "(read)"
                 note = f"(read: {link})"

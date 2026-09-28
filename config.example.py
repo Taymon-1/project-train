@@ -128,6 +128,13 @@ SEARCH_BACKEND = "auto"     # "auto" tries several engines; "duckduckgo" pins it
 READ_PASTED_URLS = True     # read any web address someone pastes at her
 MAX_URLS_PER_MESSAGE = 2    # how many links from one message she'll open
 URL_CHARS = 40000           # how much of a pasted page she reads (was 4000)
+
+# After a lookup she keeps a short copy of what she found in front of
+# her for the next few messages, so a follow-up question is answered
+# from it instead of the same search running again.
+LOOKUP_REMEMBER_MESSAGES = 3   # carried for this many messages...
+LOOKUP_REMEMBER_MINUTES = 15   # ...or this long, whichever ends first
+LOOKUP_BRIEF_CHARS = 4000      # size of the copy she carries (~1,000 tokens)
 READING_LINE = "Give me a second, I'm reading that."
 
 # ---- MEMORY ----
