@@ -774,6 +774,29 @@ def note_departure(name):
 
 # ---- THE DIARY ----
 
+def _full_name(who, people):
+    """The diary tends to name people by first name only ("Taymon"),
+    which started a second file beside "Taymon Jules". A first name is
+    matched to the one person in the conversation, or failing that the
+    one person on file, whose full name starts with it."""
+    plain = corrade.plain_name(who)
+    if not plain or " " in plain:
+        return plain
+    first = plain.lower()
+    matches = [p for p in people if p.split()[0].lower() == first]
+    if len(matches) == 1:
+        return matches[0]
+    if matches:
+        return plain
+    skip = {os.path.basename(config.SELF_FILE), os.path.basename(config.GREET_FILE)}
+    on_file = [f[:-5] for f in os.listdir(config.MEMORY_DIR)
+               if f.endswith(".json") and f not in skip
+               and f.startswith(first + "_")]
+    if len(on_file) == 1:
+        return memory.load_person(on_file[0].replace("_", " "))["name"]
+    return plain
+
+
 # Said to the model when its diary answer could not be read.
 DIARY_AGAIN = ("Your answer could not be read. Answer again with ONLY the JSON "
                "object - nothing before or after it. Inside the entry, use single "
@@ -824,6 +847,10 @@ def write_diary_entry(lines):
     if known:
         messages.append({"role": "system", "content": known})
     messages.append({"role": "system", "content": persona.DIARY_PROMPT})
+    if people:
+        messages.append({"role": "system", "content":
+                         "In \"remember\", name each person by their full name, "
+                         "exactly as written here: " + ", ".join(people) + "."})
     messages.append({"role": "user", "content": transcript})
 
     # An answer the code can't read is shown on the console and asked
@@ -878,7 +905,7 @@ def write_diary_entry(lines):
         for item in (data.get("remember") or [])[:3]:
             if not isinstance(item, dict):
                 continue
-            who = str(item.get("person", "")).strip()
+            who = _full_name(str(item.get("person", "")).strip(), people)
             fact = str(item.get("fact", "")).strip()
             if not who or not fact:
                 continue

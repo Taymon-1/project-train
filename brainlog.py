@@ -13,6 +13,7 @@
 # placeholder (or nothing).
 ###############################################
 import os
+import re
 import sys
 import threading
 from datetime import datetime, timedelta
@@ -21,6 +22,10 @@ import config
 
 _lock = threading.RLock()
 _state = {"file": None, "date": None, "line_start": True, "console": None}
+
+# Colour codes (the web server colours its own lines) mean nothing in a
+# text file - they only show up as "[31m" junk - so they are taken out.
+_COLOUR = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
 def _prune():
@@ -65,6 +70,7 @@ def _to_log(text):
         return
     try:
         f = _log_file()
+        text = _COLOUR.sub("", text)
         stamp = datetime.now().strftime("[%H:%M:%S] ")
         out = []
         for piece in text.splitlines(keepends=True):
