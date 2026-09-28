@@ -13,6 +13,7 @@ import threading
 from datetime import datetime
 
 import config
+from brainlog import private
 import persona
 import ai
 import memory
@@ -246,7 +247,7 @@ def read_links(urls, name):
     """Open each link and return one block of text, or None."""
     blocks = []
     for url in urls:
-        print(f"  READING: {url}")
+        private(f"  READING: {url}", log="  READING: [a pasted link]")
         page = websearch.read_page(url, limit=config.URL_CHARS)
         if page:
             print(f"  READING: got {len(page)} characters")
@@ -354,7 +355,8 @@ def handle_command(speaker, message, is_owner=False):
     if command.startswith("!"):
         # A command she does not have. Never let Aion answer this - it
         # would cheerfully claim to have done it.
-        print(f"  (unknown command: {message.strip()[:40]})")
+        private(f"  (unknown command: {message.strip()[:40]})",
+                log="  (unknown command)")
         return ("I don't have a command called "
                 f"{message.strip().split()[0]}. Type !help for the list.")
 
@@ -540,7 +542,8 @@ def respond_to(speaker, message, speaker_name=None,
             if channel == "local":
                 corrade.pace(started, channel, reply, speaker)
                 corrade.say(reply)
-                print(f"<< Train: {reply}")
+                private(f"<< Train: {reply}",
+                        log=f"<< Train: [holding line, {len(reply)} chars]")
                 holding_line = reply
                 started = time.time()
 
@@ -563,7 +566,7 @@ def respond_to(speaker, message, speaker_name=None,
                 if results:
                     print("  READING: same page as a moment ago - reusing what she read")
                 else:
-                    print(f"  READING: {link}")
+                    private(f"  READING: {link}", log="  READING: [a link she chose]")
                     page = websearch.read_page(link, limit=config.URL_CHARS)
                     results = (f"Page at {link}:\n{page}" if page
                                else f"The page at {link} could not be read.")
@@ -628,11 +631,12 @@ def respond_to(speaker, message, speaker_name=None,
         stage["memory"] = time.time()
 
         for fact in added:
-            print(f"  [MEMORY +] {speaker}: {fact}")
+            private(f"  [MEMORY +] {speaker}: {fact}",
+                    log=f"  [MEMORY +] a note about {speaker}")
         for change in fixed:
-            print(f"  [MEMORY ~] {change}")
+            private(f"  [MEMORY ~] {change}", log="  [MEMORY ~] a note was corrected")
         for fact in self_added:
-            print(f"  [SELF +] {fact}")
+            private(f"  [SELF +] {fact}", log="  [SELF +] a note about herself")
 
         # If she decided to move, set it going - but only Taymon can
         # send her anywhere. Anyone else's "come here" stays words.
@@ -646,7 +650,7 @@ def respond_to(speaker, message, speaker_name=None,
 
         corrade.pace(started, channel, reply, speaker)
         _print_timing(stage)
-        print(f"<< Train: {reply}")
+        private(f"<< Train: {reply}", log=f"<< Train: [reply, {len(reply)} chars]")
         return reply
 
     finally:
@@ -746,7 +750,8 @@ def greet_arrival(name, uuid=None):
             session_lines.append(f"Train: {reply}")
 
         corrade.pace(started, "local", reply, name)
-        print(f"<< Train greets {name}: {reply}")
+        private(f"<< Train greets {name}: {reply}",
+                log=f"<< Train greets {name}: [reply, {len(reply)} chars]")
         corrade.say(reply)
     finally:
         corrade.typing(False)
@@ -828,7 +833,8 @@ def write_diary_entry(lines):
         if data and str(data.get("entry", "")).strip():
             break
         data = None
-        print(f"  [DIARY] unreadable answer:\n{raw}")
+        private(f"  [DIARY] unreadable answer:\n{raw}",
+                log=f"  [DIARY] answer unreadable ({len(raw)} chars, not logged)")
         if attempt == 1:
             print("  [DIARY] asking once more")
             messages = messages + [{"role": "system", "content": DIARY_AGAIN}]
@@ -869,11 +875,12 @@ def write_diary_entry(lines):
                 continue
             record = memory.load_person(who)
             if memory.add_facts(record, [fact], config.CORE_LIMIT):
-                print(f"  [DIARY +] {who}: {fact}")
+                private(f"  [DIARY +] {who}: {fact}",
+                        log=f"  [DIARY +] a note about {who}")
             memory.save_person(record)
             touched.add(who)
 
-    print(f"  [DIARY] {entry}")
+    private(f"  [DIARY] {entry}", log=f"  [DIARY] entry written ({len(entry)} chars)")
 
     memory.maybe_consolidate(True)
     for who in touched:

@@ -11,6 +11,7 @@ import threading
 from openai import OpenAI
 
 import config
+from brainlog import private
 
 client = OpenAI(api_key=config.API_KEY, base_url=config.API_BASE)
 
@@ -25,9 +26,20 @@ class _OnlyRetries(_logging.Filter):
         return "etry" in record.getMessage()
 
 
+class _LibraryHandler(_logging.StreamHandler):
+    """The library's "Request options" line carries the whole request -
+    her persona, notes and the chat - so it stays off the log file."""
+    def emit(self, record):
+        if record.getMessage().startswith("Request options"):
+            private(self.format(record),
+                    log="  aion library: [request options, not logged]")
+        else:
+            super().emit(record)
+
+
 _retry_log = _logging.getLogger("openai._base_client")
 _retry_log.setLevel(_logging.DEBUG)
-_handler = _logging.StreamHandler()
+_handler = _LibraryHandler()
 _handler.setFormatter(_logging.Formatter("  aion library: %(message)s"))
 _handler.addFilter(_OnlyRetries())
 _retry_log.addHandler(_handler)
@@ -152,7 +164,7 @@ def slip(text):
 
     if new == word:
         return text
-    print(f"  (typo: {word} -> {new})")
+    private(f"  (typo: {word} -> {new})", log="  (typo added)")
     return text[:start] + new + text[start + len(word):]
 
 
@@ -424,7 +436,8 @@ def parse_turn(raw):
                   "there were no notes in it)")
         else:
             print("  (answer was malformed - kept the reply, discarded notes)")
-            print(f"  RAW ANSWER: {str(raw)[:800]}")
+            private(f"  RAW ANSWER: {str(raw)[:800]}",
+                    log=f"  RAW ANSWER: [{len(str(raw))} chars, not logged]")
         return slip(salvaged), [], [], []
 
     return None, [], [], []

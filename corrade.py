@@ -16,6 +16,7 @@ from collections import deque
 import requests
 
 import config
+from brainlog import private
 
 name_cache = {}        # uuid -> name
 uuid_by_name = {}      # lowercase name -> uuid
@@ -51,7 +52,8 @@ def send(params, quiet=False, timeout=45):
         )
         if not quiet:
             print(f"  Corrade status: {response.status_code}")
-            print(f"  Corrade response: {response.text[:300]}")
+            private(f"  Corrade response: {response.text[:300]}",
+                    log=f"  Corrade response: [{len(response.text)} chars]")
         return response.text
     except Exception as e:
         print(f"  ERROR talking to Corrade: {e}")
@@ -194,7 +196,8 @@ def pace(started, channel, text="", speaker=""):
 
 def say(message):
     """Speak in local chat."""
-    print(f"  Train says: {message}")
+    private(f"  Train says: {message}",
+            log=f"  Train says: [{len(message)} chars]")
     recent_said.append(_tidy(message))
     send(_auth({
         "command": "tell",
@@ -211,7 +214,8 @@ def say_to(name, message, uuid=None):
         print(f"  IM: no way to address '{name}' - no key and no usable name.")
         return False
 
-    print(f"  Train IMs {name}: {message}")
+    private(f"  Train IMs {name}: {message}",
+            log=f"  Train IMs {name}: [{len(message)} chars]")
     recent_said.append(_tidy(message))
     raw = send(_auth(dict({
         "command": "tell",

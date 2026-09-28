@@ -13,6 +13,7 @@ import threading
 from datetime import datetime
 
 import config
+from brainlog import private
 import ai
 from persona import CONSOLIDATE_PROMPT
 
@@ -235,10 +236,12 @@ def add_facts(record, new_facts, core_limit):
             existing = bucket[index]
             if len(fact) > len(existing) * 1.2:
                 bucket[index] = fact
-                print(f"  [MEMORY ~] refined: {existing}")
-                print(f"             now:     {fact}")
+                private(f"  [MEMORY ~] refined: {existing}\n"
+                        f"             now:     {fact}",
+                        log="  [MEMORY ~] a note was refined")
             else:
-                print(f"  [MEMORY =] already known: {fact}")
+                private(f"  [MEMORY =] already known: {fact}",
+                        log="  [MEMORY =] a note was already known")
             continue
 
         core.append(fact)
@@ -388,7 +391,7 @@ def guard_tidy(originals, merged):
         print(f"  [TIDY] guard: kept the original wording of {restored} note(s); "
               f"put back {len(put_back)} note(s) the tidy had lost.")
         for original in put_back:
-            print(f"     put back: {original}")
+            private(f"     put back: {original}")
     return final, restored, put_back
 
 
@@ -737,10 +740,11 @@ def build_notebook(record, self_record, message, system_text, history=None):
     fetched, used = fit_lines(archive_hits + diary_texts, budget)
     if archive_hits or diary_hits or recall_took > 1.0:
         how = "meaning" if _embed["state"] == "ready" else "keywords"
-        print(f"  [RECALL by {how}, {recall_took:.2f}s] {len(archive_hits)} note(s), "
-              f"{len(diary_hits)} diary entr{'y' if len(diary_hits) == 1 else 'ies'}"
-              + (": " + " | ".join(l[:50] for l in archive_hits[:3])
-                 if archive_hits else ""))
+        counts = (f"  [RECALL by {how}, {recall_took:.2f}s] {len(archive_hits)} note(s), "
+                  f"{len(diary_hits)} diary entr{'y' if len(diary_hits) == 1 else 'ies'}")
+        private(counts + (": " + " | ".join(l[:50] for l in archive_hits[:3])
+                          if archive_hits else ""),
+                log=counts)
 
     blocks = []
     name = record.get("name", "this person")

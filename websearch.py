@@ -13,6 +13,7 @@ import threading
 import requests
 
 import config
+from brainlog import private
 
 _lock = threading.Lock()   # one search at a time
 _warned = False
@@ -52,7 +53,7 @@ def ddg_search(query, count=None):
                                   max_results=count,
                                   backend=config.SEARCH_BACKEND)
     except Exception as e:
-        print(f"  DDG ERROR: {e}")
+        private(f"  DDG ERROR: {e}", log=f"  DDG ERROR: {type(e).__name__}")
         return []
 
     out = []
@@ -76,7 +77,8 @@ def ddg_read(url, limit):
         with _lock:
             result = _engine().extract(url, fmt="text_plain")
     except Exception as e:
-        print(f"  DDG READ ERROR ({url}): {e}")
+        private(f"  DDG READ ERROR ({url}): {e}",
+                log=f"  DDG READ ERROR: {type(e).__name__}")
         return None
 
     text = ""
@@ -214,7 +216,8 @@ def look_up(query):
     query = str(query or "").strip()
     if not query:
         return None
-    print(f"  SEARCH ({config.SEARCH_PROVIDER}): {query}")
+    private(f"  SEARCH ({config.SEARCH_PROVIDER}): {query}",
+            log=f"  SEARCH ({config.SEARCH_PROVIDER}): [query, {len(query)} chars]")
 
     answer = ""
     hits = []
@@ -252,7 +255,8 @@ def look_up(query):
         page = read_page(source) or ""
 
     if page:
-        print(f"  SEARCH: full text of {source} ({len(page)} characters)")
+        private(f"  SEARCH: full text of {source} ({len(page)} characters)",
+                log=f"  SEARCH: full text of the first result ({len(page)} characters)")
         lines.append(f"Full text from the first result ({source}):")
         lines.append(page[:config.SEARCH_PAGE_CHARS])
 

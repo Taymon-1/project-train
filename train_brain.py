@@ -40,6 +40,12 @@ try:
 except OSError:
     pass                    # nothing there - carry on
 
+# Before anything else prints or sets up its own output, so the log
+# catches everything from here on.
+import brainlog
+brainlog.start()
+from brainlog import private
+
 from flask import Flask, request as flask_request
 
 import persona
@@ -116,7 +122,8 @@ def handle_chat():
     # Scripted objects talk in local chat too. She only answers people.
     entity = str(params.get('entity') or '').strip().lower()
     if entity and entity != "agent":
-        print(f"  (ignoring {entity} chat from {name}: {message[:60]})")
+        private(f"  (ignoring {entity} chat from {name}: {message[:60]})",
+                log=f"  (ignoring {entity} chat from {name})")
         return "OK", 200
 
     if corrade.is_her(name):
@@ -134,12 +141,14 @@ def handle_chat():
     # crowd. She stays out of it entirely - anyone who wants her,
     # Taymon included, can IM her.
     if not corrade.is_home():
-        print(f"  (away from home - ignoring local chat from {name}: "
-              f"{message[:60]})")
+        private(f"  (away from home - ignoring local chat from {name}: "
+                f"{message[:60]})",
+                log=f"  (away from home - ignoring local chat from {name})")
         return "OK", 200
 
     corrade.remember_agent(name, speaker_uuid)
-    print(f"\n>> {name}: {message}")
+    private(f"\n>> {name}: {message}",
+            log=f">> {name}: [local chat, {len(message)} chars]")
 
     arrival_spoke(name)
     threading.Thread(target=body.face,
@@ -190,7 +199,8 @@ def handle_im():
         print(f"  IM: no agent key in this notification - keys were "
               f"{sorted(params.keys())}")
 
-    print(f"\n>> {name} (IM): {message}")
+    private(f"\n>> {name} (IM): {message}",
+            log=f">> {name} (IM): [IM, {len(message)} chars]")
 
     def worker():
         reply = talk.respond_to(name, message,
@@ -278,7 +288,9 @@ def handle_lure():
         return "no", 403
 
     params = corrade.parse_notification(flask_request.get_data(as_text=True))
-    print(f"\n  TELEPORT OFFER: {params}")
+    private(f"\n  TELEPORT OFFER: {params}",
+            log=f"  TELEPORT OFFER: from {params.get('name') or '?'} "
+                f"[details not logged]")
 
     threading.Thread(target=travel.handle_lure,
                      args=(params,), daemon=True).start()

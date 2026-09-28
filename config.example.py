@@ -156,6 +156,13 @@ SIMILARITY_THRESHOLD = 0.82    # how alike two notes must be to count as one
 CONSOLIDATE_EVERY = 20         # new notes before a tidy-up pass runs
 CONSOLIDATE_MINIMUM = 8        # don't tidy a file smaller than this
 
+# ---- LOG FILE ----
+# Everything on the console also goes to logs/brain_YYYY-MM-DD.log -
+# system events only. Chat text, her replies, notes, diary entries and
+# search words appear there only as placeholders like "[reply, 84 chars]".
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+LOG_KEEP_DAYS = 14             # older daily logs are deleted
+
 # ---- TIMING ----
 IDLE_MINUTES = 10              # silence before she writes a diary entry
 DIARY_TRIES = 3                # quiet spells a conversation gets before its entry is given up

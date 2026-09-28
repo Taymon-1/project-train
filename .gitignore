@@ -16,6 +16,9 @@ train_self*.json
 greeted.json
 *.jsonl
 
+# ---- LOGS ----
+logs/
+
 # ---- ANYTHING THAT COULD CARRY ADDRESSES OR KEYS ----
 *.log
 *.pem

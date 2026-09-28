@@ -5,6 +5,7 @@
 # somewhere on her own.
 ###############################################
 import config
+from brainlog import private
 import corrade
 
 # Where she lands when no position is given.
@@ -116,7 +117,9 @@ def handle_lure(params):
         corrade.remember_agent(who, uuid)
 
     if not session:
-        print(f"  lure: no session in the notification - {params}")
+        private(f"  lure: no session in the notification - {params}",
+                log=f"  lure: no session in the notification - "
+                    f"fields {sorted(params)}")
         return
 
     if is_trusted(who, uuid):
