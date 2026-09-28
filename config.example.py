@@ -151,6 +151,7 @@ CONSOLIDATE_MINIMUM = 8        # don't tidy a file smaller than this
 
 # ---- TIMING ----
 IDLE_MINUTES = 10              # silence before she writes a diary entry
+DIARY_TRIES = 3                # quiet spells a conversation gets before its entry is given up
 GREET_COOLDOWN_HOURS = 12      # before greeting the same person again
 STARTUP_GRACE_SECONDS = 30     # ignore arrivals right after startup
 

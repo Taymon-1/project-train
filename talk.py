@@ -642,7 +642,34 @@ def note_departure(name):
 
 # ---- THE DIARY ----
 
+# Said to the model when its diary answer could not be read.
+DIARY_AGAIN = ("Your answer could not be read. Answer again with ONLY the JSON "
+               "object - nothing before or after it. Inside the entry, use single "
+               "quotes ('like this') for anything you quote.")
+
+_diary_retry = {"after": 0.0, "tries": 0}
+
+
+def _rescue_entry(raw):
+    """The entry text from a broken answer - most often a plain quote mark
+    inside it, which breaks the JSON. Returns "" if there is none."""
+    text = ai.strip_fences(raw or "")
+    start = re.search(r'"entry"\s*:\s*"', text)
+    if not start:
+        return ""
+    rest = text[start.end():]
+    # It ends at the quote before the next field, or before the closing brace.
+    end = re.search(r'"\s*(?:,\s*"[a-z_]+"\s*:|\})', rest)
+    if not end:
+        return ""
+    entry = rest[:end.start()].replace('\\"', '"').replace("\\n", " ")
+    entry = re.sub(r"\s+", " ", entry).strip()
+    return entry if len(entry) >= 20 else ""
+
+
 def write_diary_entry(lines):
+    """Write her diary entry for a finished conversation. Returns True
+    when it was written, False if it could not be."""
     transcript = "\n".join(lines)
     # Who was in the conversation. Lines in brackets are her own notes
     # ("(looked up: ...)", "(Taymon arrived)"), not people, and a
@@ -667,19 +694,40 @@ def write_diary_entry(lines):
     messages.append({"role": "system", "content": persona.DIARY_PROMPT})
     messages.append({"role": "user", "content": transcript})
 
-    raw, _ = ai.ask(config.MODEL_CHEAP, messages, config.MAX_DIARY_TOKENS,
-                    "(diary)")
-    if raw is None:
-        return
+    # An answer the code can't read is shown on the console and asked
+    # for once more. If the second is no better, the entry text alone is
+    # rescued from whichever answer has it - its notes can't be trusted,
+    # so they are dropped.
+    data = None
+    answers = []
+    for attempt in (1, 2):
+        raw, _ = ai.ask(config.MODEL_CHEAP, messages, config.MAX_DIARY_TOKENS,
+                        "(diary)", retries=1)
+        if raw is None:
+            return False
+        answers.append(raw)
+        data = ai.extract_json(raw)
+        if data and str(data.get("entry", "")).strip():
+            break
+        data = None
+        print(f"  [DIARY] unreadable answer:\n{raw}")
+        if attempt == 1:
+            print("  [DIARY] asking once more")
+            messages = messages + [{"role": "system", "content": DIARY_AGAIN}]
 
-    data = ai.extract_json(raw)
-    if not data:
-        print("  [DIARY] could not read the entry, skipping.")
-        return
+    if data is None:
+        for raw in reversed(answers):
+            rescued = _rescue_entry(raw)
+            if rescued:
+                print("  [DIARY] rescued the entry from a broken answer - "
+                      "its notes were dropped")
+                data = {"entry": rescued}
+                break
+    if data is None:
+        print("  [DIARY] could not read the entry.")
+        return False
 
     entry = str(data.get("entry", "")).strip()
-    if not entry:
-        return
 
     touched = set()
 
@@ -712,22 +760,45 @@ def write_diary_entry(lines):
     memory.maybe_consolidate(True)
     for who in touched:
         memory.maybe_consolidate(False, who)
+    return True
+
+
+def _diary_tick():
+    with session_lock:
+        if not session_lines:
+            return
+        if time.time() - last_message_time < config.IDLE_MINUTES * 60:
+            return
+        if time.time() < _diary_retry["after"]:
+            return
+        if len(session_lines) < 4:
+            session_lines.clear()
+            return
+        lines = list(session_lines)
+        session_lines.clear()
+    if write_diary_entry(lines):
+        _diary_retry["tries"] = 0
+        return
+
+    # Not written. Keep the conversation for the next quiet spell rather
+    # than lose it, but not forever.
+    _diary_retry["tries"] += 1
+    if _diary_retry["tries"] >= config.DIARY_TRIES:
+        _diary_retry["tries"] = 0
+        print(f"  [DIARY] gave up on this conversation after "
+              f"{config.DIARY_TRIES} tries.")
+        return
+    with session_lock:
+        session_lines[:0] = lines          # ahead of anything said since
+    _diary_retry["after"] = time.time() + config.IDLE_MINUTES * 60
+    print(f"  [DIARY] kept the conversation - will try again after "
+          f"{config.IDLE_MINUTES} more quiet minutes.")
 
 
 def diary_watcher():
     while True:
         time.sleep(60)
         try:
-            with session_lock:
-                if not session_lines:
-                    continue
-                if time.time() - last_message_time < config.IDLE_MINUTES * 60:
-                    continue
-                if len(session_lines) < 4:
-                    session_lines.clear()
-                    continue
-                lines = list(session_lines)
-                session_lines.clear()
-            write_diary_entry(lines)
+            _diary_tick()
         except Exception as e:
             print(f"  DIARY WATCHER ERROR: {e}")
