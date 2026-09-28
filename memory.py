@@ -276,35 +276,167 @@ def apply_corrections(record, corrections):
     return changed
 
 
+# ---- THE TIDY GUARD ----
+# The tidy is asked to merge notes, not lose them, but it does not
+# always manage. On 23 Sep 2026 it folded four short notes onto the end
+# of notes already at the 200-character limit, and the trim cut them off
+# again - gone. It also rewrites "me" as "Train" though told not to.
+# So after every tidy: a note whose only change is who-is-who wording
+# goes back to how it was, and any note whose content is no longer in
+# any surviving note is put back next to where its content went.
+
+# Words that only say who is who.
+_PERSON_WORDS = {
+    "i", "me", "my", "mine", "myself",
+    "train", "she", "her", "hers", "herself",
+    "he", "him", "his", "himself", "taymon", "dave",
+    "we", "us", "our", "ours", "they", "them", "their", "theirs", "themselves",
+}
+ABSORBED_IF = 0.8     # share of a note's content words that must survive
+                      # together in one note for it to count as merged in
+
+
+def _words(text):
+    words = re.findall(r"[a-z0-9']+", str(text).lower())
+    return [w[:-2] if w.endswith("'s") else w.strip("'") for w in words]
+
+
+_VERB_FORMS = {"am": "is", "are": "is", "has": "have", "does": "do", "were": "was"}
+
+
+def _verb_base(word):
+    """The verb after a who-is-who word changes with it ("I do" / "she
+    does", "I am" / "she is"), so compare its plain form."""
+    if word in _VERB_FORMS:
+        return _VERB_FORMS[word]
+    if word.endswith("ies"):
+        return word[:-3] + "y"
+    if word.endswith(("sses", "shes", "ches", "xes", "zes", "oes")):
+        return word[:-2]
+    if word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _person_blind(text):
+    """The words of a note with who-is-who words blanked out, the verb
+    after each one in its plain form, and any leading subject the tidy
+    likes to add ("Taymon called ...") dropped."""
+    words = []
+    for w in _words(text):
+        if not w:
+            continue
+        if w in _PERSON_WORDS:
+            words.append("*")
+        elif words and words[-1] == "*":
+            words.append(_verb_base(w))
+        else:
+            words.append(w)
+    while words and words[0] == "*":
+        words.pop(0)
+    return words
+
+
+def _content(text):
+    return {w for w in _words(text)
+            if w and w not in _PERSON_WORDS and w not in STOPWORDS
+            and (len(w) > 2 or w.isdigit())}
+
+
+def _coverage(original, note):
+    want = _content(original)
+    if not want:
+        return 1.0
+    return len(want & _content(note)) / len(want)
+
+
+def guard_tidy(originals, merged):
+    """
+    Check a tidy result against the notes it came from. Returns
+    (notes to keep, how many had their wording restored, the original
+    notes that were put back).
+    """
+    final = list(merged)
+    used = set()
+
+    # 1. Only who-is-who words (or punctuation) changed: keep the original.
+    restored = 0
+    for j, note in enumerate(final):
+        blind = _person_blind(note)
+        for i, original in enumerate(originals):
+            if i not in used and _person_blind(original) == blind:
+                used.add(i)
+                if note != original:
+                    final[j] = original
+                    restored += 1
+                break
+
+    # 2. Anything else whose content survives in one note is merged in;
+    #    anything that does not is put back beside its closest note.
+    put_back = []
+    for i, original in enumerate(originals):
+        if i in used:
+            continue
+        scores = [_coverage(original, note) for note in final]
+        best = max(range(len(final)), key=lambda j: scores[j]) if final else -1
+        if best >= 0 and scores[best] >= ABSORBED_IF:
+            continue
+        final.insert(best + 1, original)
+        put_back.append(original)
+
+    if restored or put_back:
+        print(f"  [TIDY] guard: kept the original wording of {restored} note(s); "
+              f"put back {len(put_back)} note(s) the tidy had lost.")
+        for original in put_back:
+            print(f"     put back: {original}")
+    return final, restored, put_back
+
+
 # ---- CONSOLIDATION (the tidy-up pass) ----
 
 def _merge_notes(facts):
     listing = "\n".join(f"- {f}" for f in facts)
-    raw, _ = ai.ask(
+    raw, finish = ai.ask(
         config.MODEL_CHEAP,
         [{"role": "system", "content": CONSOLIDATE_PROMPT},
          {"role": "user", "content": listing}],
         config.MAX_TIDY_TOKENS,
-        "(tidy)"
+        "(tidy)",
+        retries=1
     )
+    # Each way out below says why, in words with no note text in them.
     if raw is None:
+        print("  [TIDY] rejected: the request to the AI failed (see the error above).")
         return None
 
     data = ai.extract_json(raw)
     if not data:
+        text = ai.strip_fences(raw)
+        start = text.find("{")
+        why = "no JSON object found"
+        if start >= 0:
+            try:
+                json.loads(text[start:])
+            except json.JSONDecodeError as e:
+                why = f"{e.msg} at character {e.pos}"
+        print(f"  [TIDY] rejected: the answer could not be read as JSON - {why} "
+              f"({len(raw)} chars, finish={finish or '?'}).")
         return None
 
     merged = [tidy_fact(f) for f in ai.clean_list(data.get("facts"))]
     merged = [f for f in merged if f]
     if not merged:
+        print(f"  [TIDY] rejected: the answer held no notes "
+              f"(fields in it: {sorted(data.keys())}).")
         return None
 
     if len(merged) < max(2, len(facts) // 3):
-        print(f"  [TIDY] result looked lossy ({len(facts)} -> {len(merged)}), "
+        print(f"  [TIDY] rejected: result looked lossy ({len(facts)} -> {len(merged)}), "
               f"leaving the file alone.")
         return None
 
-    return merged
+    kept, _, _ = guard_tidy(facts, merged)
+    return kept
 
 
 def consolidate(is_self, name=None):
@@ -321,12 +453,17 @@ def consolidate(is_self, name=None):
     print(f"\n  [TIDY] {len(core)} notes about {label} - looking for overlaps...")
     merged = _merge_notes(core)
 
+    # A failed tidy leaves the counter alone, so it is tried again
+    # after the next diary entry rather than 20 notes from now.
+    if not merged:
+        print(f"  [TIDY] tidy of {label} did not work - will try again later.")
+        return
+
     with lock:
         record = load_self() if is_self else load_person(name)
-        if merged:
-            since = [f for f in record.get("core", []) if f not in core]
-            record["core"] = merged + since
-            print(f"  [TIDY] {len(core)} notes -> {len(record['core'])}")
+        since = [f for f in record.get("core", []) if f not in core]
+        record["core"] = merged + since
+        print(f"  [TIDY] {len(core)} notes -> {len(record['core'])}")
         record["pending"] = 0
         if is_self:
             save_self(record)
