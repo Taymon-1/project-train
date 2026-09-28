@@ -156,17 +156,32 @@ def slip(text):
     return text[:start] + new + text[start + len(word):]
 
 
-def ask(model, messages, max_tokens, label="", _retry=True):
+def ask(model, messages, max_tokens, label="", retries=None, stop=None,
+        _retry=True):
     """Send a request. Returns (text, finish_reason). text is None on failure.
 
     Aion's models think silently before they answer, and the thinking
     counts against max_tokens. When an answer comes back empty because
     the ceiling was hit, ask once more with double the room before
     giving up - the alternative is her saying the fallback line for
-    no good reason."""
+    no good reason.
+
+    retries caps how many times the library tries again after a failed
+    request; None keeps its default of two.
+
+    stop, if given, is a threading.Event: once it is set the answer is
+    no longer wanted. Returns (None, "dropped") then. The request is not
+    streamed, so one already waiting on Aion runs to the end - the
+    answer is just thrown away when it lands."""
+    if stop is not None and stop.is_set():
+        return None, "dropped"
+    caller = client
+    if retries is not None:
+        caller = client.with_options(max_retries=retries)
+
     started = time.time()
     try:
-        response = client.chat.completions.create(
+        response = caller.chat.completions.create(
             model=model,
             messages=messages,
             max_tokens=max_tokens
@@ -194,6 +209,10 @@ def ask(model, messages, max_tokens, label="", _retry=True):
     else:
         print(f"  took {took:.1f}s {label}")
 
+    if stop is not None and stop.is_set():
+        print(f"  (answer no longer wanted {label} - dropped)")
+        return None, "dropped"
+
     choice = response.choices[0]
     finish = getattr(choice, "finish_reason", "") or ""
     content = choice.message.content
@@ -201,7 +220,8 @@ def ask(model, messages, max_tokens, label="", _retry=True):
     if finish == "length" and not (content or "").strip() and _retry:
         print(f"  (thought too long and said nothing {label} - "
               f"asking again with room for {max_tokens * 2})")
-        return ask(model, messages, max_tokens * 2, label, _retry=False)
+        return ask(model, messages, max_tokens * 2, label, retries=retries,
+                   stop=stop, _retry=False)
 
     if finish == "length":
         print(f"  WARNING: reply hit the token ceiling {label} - "
