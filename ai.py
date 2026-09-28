@@ -6,6 +6,7 @@
 import re
 import time
 import json
+import threading
 
 from openai import OpenAI
 
@@ -32,7 +33,8 @@ _handler.addFilter(_OnlyRetries())
 _retry_log.addHandler(_handler)
 _retry_log.propagate = False
 
-session_cost = {"in": 0, "out": 0}
+session_cost = {"usd": 0.0}
+_cost_lock = threading.Lock()     # background work can ask at the same time
 
 
 # ---- NARRATION FILTER ----
@@ -179,13 +181,16 @@ def ask(model, messages, max_tokens, label="", _retry=True):
     if usage:
         tin = getattr(usage, "prompt_tokens", 0) or 0
         tout = getattr(usage, "completion_tokens", 0) or 0
-        session_cost["in"] += tin
-        session_cost["out"] += tout
-        dollars = (session_cost["in"] * config.PRICE_IN +
-                   session_cost["out"] * config.PRICE_OUT)
+        if model == config.MODEL_CHEAP:
+            price_in, price_out = config.PRICE_IN_CHEAP, config.PRICE_OUT_CHEAP
+        else:
+            price_in, price_out = config.PRICE_IN, config.PRICE_OUT
+        with _cost_lock:
+            session_cost["usd"] += tin * price_in + tout * price_out
+            total = session_cost["usd"]
         print(f"  tokens in/out: {tin}/{tout} {label}"
               f"   took {took:.1f}s"
-              f"   session total: ${dollars:.4f}")
+              f"   session total: ${total:.4f}")
     else:
         print(f"  took {took:.1f}s {label}")
 

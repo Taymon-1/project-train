@@ -22,10 +22,13 @@ RANGE = 240                      # Corrade's own radar range, metres
 # ---- AION API ----
 API_KEY = "your-aion-api-key"
 API_BASE = "https://api.aionlabs.ai/v1"
-MODEL = "aion-labs/aion-3.0"              # what she speaks with
+MODEL = "aion-labs/aion-3.5"              # what she speaks with
+                                          # (was "aion-labs/aion-3.0" until 28 Sep 2026)
 MODEL_CHEAP = "aion-labs/aion-3.0-mini"   # diary, tidying, background work
 PRICE_IN = 3.00 / 1_000_000               # dollars per input token
 PRICE_OUT = 6.00 / 1_000_000              # dollars per output token
+PRICE_IN_CHEAP = 0.70 / 1_000_000         # the same, for MODEL_CHEAP
+PRICE_OUT_CHEAP = 1.40 / 1_000_000
 MAX_REPLY_TOKENS = 2000    # room for the reply AND its memory notes.
                            # The model thinks silently first and that
                            # counts; at 900 an unlucky long think came
