@@ -23,7 +23,7 @@ import logging as _logging
 
 class _OnlyRetries(_logging.Filter):
     def filter(self, record):
-        return "etry" in record.getMessage()
+        return "etry" in record.getMessage() and not record.getMessage().startswith("Request options")
 
 
 class _LibraryHandler(_logging.StreamHandler):

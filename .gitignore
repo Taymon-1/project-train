@@ -15,9 +15,14 @@ memory/
 train_self*.json
 greeted.json
 *.jsonl
+daydream.json
 
-# ---- LOGS ----
+# ---- LOGS AND BACKUPS ----
 logs/
+backups/
+profile_backups/
+*backup*/
+*.bak
 
 # ---- ANYTHING THAT COULD CARRY ADDRESSES OR KEYS ----
 *.log

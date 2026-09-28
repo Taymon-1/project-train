@@ -78,6 +78,9 @@ HELP_TEXT = ("Say stop any time and I'll stop walking. "
              "!read URL, !profile NAME, !tp REGION, !where, !look, !time, !help. "
              "Everything else, just ask me normally.")
 
+EARLY_LINE_MAX = 120       # longer than this, her "hang on" line is a guess
+                           # at the answer, so the plain SEARCHING_LINE is said
+
 URL_PATTERN = re.compile(r'(https?://[^\s<>"\']+|www\.[^\s<>"\']+)', re.I)
 
 PROFILE_HEADER = ("You do not know this person yet, so you glanced at their "
@@ -540,11 +543,17 @@ def respond_to(speaker, message, speaker_name=None,
         note = None
         if query or link or person:
             if channel == "local":
-                corrade.pace(started, channel, reply, speaker)
-                corrade.say(reply)
-                private(f"<< Train: {reply}",
-                        log=f"<< Train: [holding line, {len(reply)} chars]")
-                holding_line = reply
+                # Her first answer is the line she says while she goes and
+                # looks ("Hang on, let me check"). If it came out long it is
+                # probably a guess at the answer, so a plain "hang on" goes
+                # out instead.
+                line = (reply if len(reply) <= EARLY_LINE_MAX
+                        else config.SEARCHING_LINE)
+                corrade.pace(started, channel, line, speaker)
+                corrade.say(line)
+                private(f"<< Train: {line}",
+                        log=f"<< Train: [holding line, {len(line)} chars]")
+                holding_line = line
                 started = time.time()
 
             if query:
