@@ -16,14 +16,32 @@
 ###############################################
 
 import os
+import sys
 import time
 import random
+import socket
 import threading
 from collections import deque
 
+import config
+
+# ---- ONLY ONE OF HER ----
+# Starting her a second time by hand is an easy slip, and Windows lets
+# a second copy share the port, leaving two brains writing the same
+# memory files. If something already answers on her port, say so and
+# stop before memory is touched.
+try:
+    with socket.create_connection(("127.0.0.1", config.LISTEN_PORT), timeout=3):
+        print(f"Train is already running - something answers on port "
+              f"{config.LISTEN_PORT}.")
+        print("Not starting a second copy. To restart her, close the other "
+              "Train window first.")
+        sys.exit(1)
+except OSError:
+    pass                    # nothing there - carry on
+
 from flask import Flask, request as flask_request
 
-import config
 import persona
 import memory
 import corrade
@@ -342,6 +360,7 @@ if __name__ == '__main__':
     print(f"Self notes: {len(me.get('core', []))} core, "
           f"{len(me.get('archive', []))} archived")
     print(f"Diary entries: {len(me.get('diary', []))}")
+    talk.load_conversation()
 
     corrade.assume_home()
     threading.Timer(3.0, subscribe_all).start()

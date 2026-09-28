@@ -27,6 +27,51 @@ session_lines = []         # transcript waiting for the diary
 last_message_time = 0.0
 session_lock = threading.Lock()
 
+
+# ---- RECENT CHAT ON DISK ----
+# The short-term chat buffer used to live only in the running brain, so
+# a restart wiped it and she lost the thread. It is saved after every
+# exchange and put back at startup. One JSON line per chat line;
+# deliberately not a .json file, because every .json in the memory
+# folder is taken to be a person. Replies run on several threads at
+# once, so the file is written under its own lock.
+RECENT_CHAT_FILE = os.path.join(config.MEMORY_DIR, "recent_chat.jsonl")
+_recent_chat_lock = threading.Lock()
+
+
+def _save_conversation():
+    temp = RECENT_CHAT_FILE + ".tmp"
+    with _recent_chat_lock:
+        try:
+            with open(temp, "w", encoding="utf-8") as f:
+                for line in list(conversation):
+                    f.write(json.dumps(line, ensure_ascii=False) + "\n")
+            os.replace(temp, RECENT_CHAT_FILE)
+        except Exception as e:
+            print(f"  RECENT CHAT: could not save it - {type(e).__name__}: {e}")
+
+
+def load_conversation():
+    """Put back the recent chat saved before the last stop. A missing or
+    unreadable file means starting empty, as a restart always did."""
+    try:
+        with open(RECENT_CHAT_FILE, "r", encoding="utf-8") as f:
+            lines = [json.loads(l) for l in f if l.strip()]
+    except FileNotFoundError:
+        print("Recent chat: none saved")
+        return
+    except Exception as e:
+        print(f"Recent chat: could not read the saved file "
+              f"({type(e).__name__}) - starting empty")
+        return
+    if not all(isinstance(l, dict) and l.get("role") in ("user", "assistant")
+               and isinstance(l.get("content"), str) for l in lines):
+        print("Recent chat: the saved file is not in the expected shape - "
+              "starting empty")
+        return
+    conversation[:] = lines[-config.MAX_HISTORY:]
+    print(f"Recent chat: {len(conversation)} lines restored")
+
 HELP_TEXT = ("Say stop any time and I'll stop walking. "
              "Admin: !memory, !self, !diary, !tidy, !search TEXT, "
              "!read URL, !profile NAME, !tp REGION, !where, !look, !time, !help. "
@@ -556,6 +601,7 @@ def respond_to(speaker, message, speaker_name=None,
         conversation.append({"role": "assistant", "content": reply})
         if len(conversation) > config.MAX_HISTORY:
             del conversation[:-config.MAX_HISTORY]
+        _save_conversation()
 
         with session_lock:
             tag = {"im": " (IM)"}.get(channel, "")
@@ -693,6 +739,7 @@ def greet_arrival(name, uuid=None):
         conversation.append({"role": "assistant", "content": reply})
         if len(conversation) > config.MAX_HISTORY:
             del conversation[:-config.MAX_HISTORY]
+        _save_conversation()
 
         with session_lock:
             session_lines.append(f"({name} arrived)")

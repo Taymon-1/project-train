@@ -14,6 +14,7 @@ memory/
 *diary*.json
 train_self*.json
 greeted.json
+*.jsonl
 
 # ---- ANYTHING THAT COULD CARRY ADDRESSES OR KEYS ----
 *.log
