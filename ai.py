@@ -52,7 +52,7 @@ NARRATION_PATTERNS = [
         r"\bi (?:do not|don't|dont)? ?think i need to correct\b",
         r"\bnothing (?:to correct|worth correcting)\b",
         r"^\s*about me\s*:",
-        r"^\s*about (?:the )?(?:person|user|him|her|them|taymon)\s*:",
+        r"^\s*about (?:the )?(?:person|user|him|her|them|taymon|dave)\s*:",
         r"^\s*about [^\n:]{1,40}:\s*$",
         r"\bremember_self\b",
         r"\bmemory note",
@@ -251,17 +251,15 @@ def _merge(into, extra):
     return into
 
 
-def extract_json(raw):
-    """Parse her answer into a dict.
+# A comma left before a closing bracket - {"a": 1,} - which JSON refuses.
+_TRAILING_COMMA = re.compile(r",(\s*[}\]])")
 
-    She sometimes returns more than one JSON object back to back - the
-    spoken line in the first, memory notes in the second. Decoding one
-    object at a time and merging keeps both. Anything that is not JSON
-    is skipped over.
-    """
-    text = strip_fences(raw)
-    decoder = json.JSONDecoder()
 
+def _decode_all(text, strict=True):
+    """Every complete JSON object in text, in order. Anything around or
+    between them is skipped over. strict=False lets a real line break
+    stand inside a string."""
+    decoder = json.JSONDecoder(strict=strict)
     found = []
     index = text.find("{")
     while index != -1:
@@ -273,6 +271,30 @@ def extract_json(raw):
         if isinstance(obj, dict):
             found.append(obj)
         index = text.find("{", end)
+    return found
+
+
+def extract_json(raw):
+    """Parse her answer into a dict.
+
+    She sometimes returns more than one JSON object back to back - the
+    spoken line in the first, memory notes in the second. Decoding one
+    object at a time and merging keeps both. Anything that is not JSON
+    is skipped over.
+
+    A second, forgiving read allows two common slips - a real line break
+    inside a string, and a comma before a closing bracket - and is used
+    when it recovers more than the strict one. An answer cut off before
+    its closing brace is NOT pieced back together: its last note could
+    be half a sentence. parse_turn still keeps its spoken line.
+    """
+    text = strip_fences(raw)
+    found = _decode_all(text)
+    if "{" in text:
+        forgiving = _decode_all(_TRAILING_COMMA.sub(r"\1", text), strict=False)
+        if len(forgiving) > len(found):
+            print("  (repaired a slightly broken answer - kept what was in it)")
+            found = forgiving
 
     if not found:
         return None
@@ -313,15 +335,56 @@ def salvage_reply(raw):
     return None
 
 
+NOTE_TEXT_KEYS = ("fact", "text", "note", "new")
+
+
 def clean_list(value, limit=None):
+    """A list of plain note sentences.
+
+    Now and then the model puts a small object in a notes list instead
+    of a sentence - {"fact": ..., "source": ...} or a correction. Turning
+    that into text saved the object itself as a "note" (three of those
+    broke a tidy on Chat Train, 23 Sep 2026). Take the sentence out of it
+    instead, and drop anything with no sentence in it."""
     if not value:
         return []
-    if isinstance(value, str):
+    if isinstance(value, (str, dict)):
         value = [value]
-    out = [str(v).strip() for v in value if str(v).strip()]
+    out = []
+    for item in value:
+        if isinstance(item, dict):
+            text = next((item[k] for k in NOTE_TEXT_KEYS
+                         if isinstance(item.get(k), str) and item[k].strip()), "")
+            print(f"  (a note arrived as an object with fields {sorted(item)} - "
+                  f"{'kept its sentence' if text else 'dropped it'})")
+            item = text
+        if not isinstance(item, str):
+            if item is not None:
+                print(f"  (dropped a note that was a {type(item).__name__}, not text)")
+            continue
+        if item.strip():
+            out.append(item.strip())
     if limit is not None:
         out = out[:limit]
     return out
+
+
+def _split_corrections(items):
+    """Pull correction objects ({"old": ..., "new": ...}) out of a notes
+    list, where the model sometimes puts them by mistake. Returns
+    (the rest, the corrections)."""
+    if not isinstance(items, list):
+        return items, []
+    rest, fixes = [], []
+    for item in items:
+        if isinstance(item, dict) and "old" in item:
+            fixes.append(item)
+        else:
+            rest.append(item)
+    if fixes:
+        print(f"  ({len(fixes)} correction(s) arrived in a notes list - "
+              f"treated as corrections)")
+    return rest, fixes
 
 
 def parse_turn(raw):
@@ -337,8 +400,11 @@ def parse_turn(raw):
             corrections = data.get("correct") or []
             if not isinstance(corrections, list):
                 corrections = []
-            facts = clean_list(data.get("remember"))
-            self_facts = clean_list(data.get("remember_self"))
+            remember, fixes = _split_corrections(data.get("remember"))
+            remember_self, self_fixes = _split_corrections(data.get("remember_self"))
+            corrections = corrections + fixes + self_fixes
+            facts = clean_list(remember)
+            self_facts = clean_list(remember_self)
 
             # Hard cap across both lists, whatever the prompt said
             room = config.MAX_FACTS_PER_TURN
@@ -347,11 +413,18 @@ def parse_turn(raw):
 
             return slip(reply), facts, self_facts, corrections
 
-    # Broken or truncated - rescue the spoken line, drop the rest
+    # Plain words, or broken/truncated JSON - rescue the spoken line.
+    # Chat Train found every "malformed" answer up to 24 Sep 2026 was
+    # the first kind: no JSON at all, so no notes were ever in it to lose.
     salvaged = trim_narration(salvage_reply(raw))
     if salvaged:
-        print("  (answer was malformed - kept the reply, discarded notes)")
-        print(f"  RAW ANSWER: {str(raw)[:800]}")
+        text = strip_fences(raw)
+        if "{" not in text and '"reply"' not in text:
+            print("  (answered in plain words, not JSON - kept the reply; "
+                  "there were no notes in it)")
+        else:
+            print("  (answer was malformed - kept the reply, discarded notes)")
+            print(f"  RAW ANSWER: {str(raw)[:800]}")
         return slip(salvaged), [], [], []
 
     return None, [], [], []
