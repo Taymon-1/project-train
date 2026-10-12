@@ -4,7 +4,7 @@ Train is an AI-powered avatar who lives in an [OpenSimulator](http://opensimulat
 
 This is a learning project built by one person, one file at a time, with help from AI assistants along the way. It is shared as-is, in the hope that it is useful or interesting to someone building their own.
 
-The story of the build, with the wins and the dead ends, is on the blog: **https://projecttrain.org/**
+The story of the build, with the wins and the dead ends, is on the blog: **https://davebook.org/project-train/**
 
 ## How it fits together
 
