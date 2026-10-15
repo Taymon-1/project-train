@@ -370,8 +370,8 @@ def handle_friendship():
             chats = memory.load_person(name).get("chats", 0)
 
         if chats < FRIEND_MIN_CHATS:
-            print(f"  FRIENDSHIP: {name} asked - only {chats} message(s) "
-                  f"from them, so it stays pending.")
+            print(f"  FRIENDSHIP: {name} asked - only {chats} exchange(s) "
+                  f"with them, so it stays pending.")
             return
 
         if config.HUMAN_TIMING:
@@ -386,7 +386,7 @@ def handle_friendship():
             if uuid:
                 record["uuid"] = uuid
             memory.save_person(record)
-        print(f"  FRIENDSHIP: accepted {name} ({chats} messages).")
+        print(f"  FRIENDSHIP: accepted {name} ({chats} exchanges).")
 
     threading.Thread(target=worker, daemon=True).start()
     return "OK", 200
