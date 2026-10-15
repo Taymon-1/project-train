@@ -22,6 +22,7 @@ import random
 import socket
 import threading
 from collections import deque
+from datetime import datetime
 
 import config
 
@@ -326,6 +327,71 @@ def handle_crossing():
     return "OK", 200
 
 
+# ---- FRIENDSHIP ----
+# She only says yes to people she has actually talked with. Anyone she
+# has answered fewer than this many times is left pending - no reply,
+# no IM - and can ask again once they know each other.
+FRIEND_MIN_CHATS = 2
+FRIEND_PAUSE = (5, 20)         # seconds before she accepts, if HUMAN_TIMING
+
+
+@app.route('/friendship', methods=['POST'])
+def handle_friendship():
+    """A friendship notification. Only a new request is acted on;
+    updates, responses, terminations and the rest are just logged."""
+    if not from_this_machine():
+        return "no", 403
+
+    params = corrade.parse_notification(flask_request.get_data(as_text=True))
+    action = str(params.get('action', '')).lower()
+    private(f"\n  FRIENDSHIP: {params}",
+            log=f"  FRIENDSHIP: action={action or '?'} "
+                f"fields={sorted(params.keys())}")
+
+    if action != "request":
+        return "OK", 200
+
+    first = str(params.get('firstname', '')).strip()
+    last = str(params.get('lastname', '')).strip()
+    uuid = corrade.agent_from(params)
+
+    def worker():
+        name = f"{first} {last}".strip()
+        if not name and uuid:
+            name = corrade.resolve_name(uuid) or ""
+        if not name or corrade.is_her(name):
+            print(f"  FRIENDSHIP: request with no usable name "
+                  f"({uuid or 'no key'}) - left pending.")
+            return
+        if uuid:
+            corrade.remember_agent(name, uuid)
+
+        with memory.lock:
+            chats = memory.load_person(name).get("chats", 0)
+
+        if chats < FRIEND_MIN_CHATS:
+            print(f"  FRIENDSHIP: {name} asked - only {chats} message(s) "
+                  f"from them, so it stays pending.")
+            return
+
+        if config.HUMAN_TIMING:
+            time.sleep(random.uniform(*FRIEND_PAUSE))
+
+        if not corrade.accept_friendship(uuid, first, last):
+            return
+
+        with memory.lock:
+            record = memory.load_person(name)
+            record["friend_since"] = datetime.now().isoformat(timespec="seconds")
+            if uuid:
+                record["uuid"] = uuid
+            memory.save_person(record)
+        print(f"  FRIENDSHIP: accepted {name} ({chats} messages).")
+
+    threading.Thread(target=worker, daemon=True).start()
+    return "OK", 200
+
+
 def subscribe_all():
     corrade.subscribe("local", "/chat")
     time.sleep(1)
@@ -338,6 +404,8 @@ def subscribe_all():
     corrade.subscribe("teleport", "/teleport")
     time.sleep(1)
     corrade.subscribe("crossing", "/crossing")
+    time.sleep(1)
+    corrade.subscribe("friendship", "/friendship")
 
 
 # ---- STARTUP ----

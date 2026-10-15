@@ -230,6 +230,33 @@ def say_to(name, message, uuid=None):
     return False
 
 
+def accept_friendship(uuid, firstname, lastname):
+    """Say yes to a friendship request. By key if there is one, else
+    by name. Returns True when Corrade says it worked."""
+    uuid = str(uuid or "").strip()
+    if uuid:
+        target = {"agent": uuid}
+    else:
+        first = str(firstname or "").strip()
+        last = str(lastname or "").strip()
+        if not first or not last:
+            print("  FRIENDSHIP: no key and no full name - can't accept.")
+            return False
+        target = {"firstname": first, "lastname": last}
+
+    raw = send(_auth(dict({
+        "command": "replytofriendshiprequest",
+        "entity": "avatar",
+        "action": "accept"
+    }, **target)), quiet=True)
+
+    if _succeeded(raw):
+        return True
+
+    print(f"  FRIENDSHIP: accept failed - {str(raw)[:200]}")
+    return False
+
+
 # ---------------------------------------------
 # WHERE SHE IS
 # ---------------------------------------------
