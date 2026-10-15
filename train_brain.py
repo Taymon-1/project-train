@@ -420,11 +420,11 @@ if __name__ == '__main__':
     print(f"Background model: {config.MODEL_CHEAP}")
     print(f"Memory folder: {config.MEMORY_DIR}")
     print(f"Notebook budget: {config.NOTEBOOK_TOKEN_BUDGET} tokens per message")
-    print(f"Reply ceiling: {config.MAX_REPLY_TOKENS} tokens")
+    print(f"Longest reply: {config.MAX_REPLY_TOKENS} tokens")
     print(f"Notes per message: max {config.MAX_FACTS_PER_TURN}")
     print(f"Greeting cooldown: {config.GREET_COOLDOWN_HOURS} hours")
     print(f"Sight range: {config.SCAN_RANGE}m")
-    print(f"Reply ceiling: {REPLY_LIMIT} a minute in local chat, "
+    print(f"Reply rate: max {REPLY_LIMIT} a minute in local chat, "
           f"{REPLY_LIMIT} in IMs")
     print(f"Human timing: {'on' if config.HUMAN_TIMING else 'off'}")
 
