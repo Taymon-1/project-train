@@ -23,6 +23,11 @@ backups/
 profile_backups/
 *backup*/
 *.bak
+*.bak-*
+config.py.*
+
+# ---- CLAUDE CODE WORKING FILES ----
+.claude/
 
 # ---- ANYTHING THAT COULD CARRY ADDRESSES OR KEYS ----
 *.log

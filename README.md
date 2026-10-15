@@ -16,7 +16,7 @@ The story of the build, with the wins and the dead ends, is on the blog: **https
 
 ## Running it
 
-1. Install Python 3.12 or newer, then `pip install flask requests openai sentence-transformers ddgs`.
+1. Install Python 3.12 or newer, then `python -m pip install -r requirements.txt`.
 2. Install and configure [Corrade](https://grimore.org/secondlife/scripted_agents/corrade) with a group that has the `talk`, `grooming`, `notifications`, `movement`, `interact` and `inventory` permissions, and its HTTP server listening on this machine.
 3. Copy `config.example.py` to `config.py` and fill in your own names, keys and passwords. `config.py` is ignored by git and is never published.
 4. Run `start_brain.bat` (or `python train_brain.py`).

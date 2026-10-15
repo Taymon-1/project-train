@@ -1,0 +1,9 @@
+# Packages the brain needs. Install with:
+#   python -m pip install -r requirements.txt
+flask
+requests
+openai
+ddgs
+numpy
+sentence-transformers   # memory search by meaning; without it, keyword only
+qrcode                  # phone page QR code
